@@ -367,7 +367,8 @@ nobase_dist_mypkg_DATA = \
     FSI/io/__init__.py \
     FSI/io/FSI_config.py \
     FSI/util/__init__.py \
-    FSI/util/switch.py
+    FSI/util/switch.py \
+    SU2/mesh/CST_ReMesh.py
 
 EXTRA_DIST = $(bin_SCRIPTS)
 all: all-am

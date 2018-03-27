@@ -2423,7 +2423,7 @@ public:
         case FFD_TWIST_2D:         nParamDV = 3; break;
         case HICKS_HENNE:          nParamDV = 2; break;
         case SURFACE_BUMP:         nParamDV = 3; break;
-        case CST:                  nParamDV = 3; break;
+        case CST:                  nParamDV = 2; break;
         case ANGLE_OF_ATTACK:      nParamDV = 1; break;
         case SCALE:                nParamDV = 0; break;
         case TRANSLATION:          nParamDV = 3; break;

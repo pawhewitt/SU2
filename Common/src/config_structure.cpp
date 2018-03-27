@@ -1585,7 +1585,7 @@ void CConfig::SetConfig_Options(unsigned short val_iZone, unsigned short val_nZo
    - FFD_THICKNESS_2D ( FFDBox ID, i_Ind )
    - HICKS_HENNE ( Lower Surface (0)/Upper Surface (1)/Only one Surface (2), x_Loc )
    - SURFACE_BUMP ( x_start, x_end, x_Loc )
-   - CST ( Lower Surface (0)/Upper Surface (1), Kulfan parameter number, Total number of Kulfan parameters for surface )
+   - CST ( Lower Surface (0)/Upper Surface (1), Weight)
    - NACA_4DIGITS ( 1st digit, 2nd digit, 3rd and 4th digit )
    - PARABOLIC ( Center, Thickness )
    - TRANSLATION ( x_Disp, y_Disp, z_Disp )
@@ -4476,11 +4476,11 @@ void CConfig::SetOutput(unsigned short val_software, unsigned short val_izone) {
             (Design_Variable[iDV] == HICKS_HENNE) ||
             (Design_Variable[iDV] == PARABOLIC) ||
             (Design_Variable[iDV] == AIRFOIL) ||
+            (Design_Variable[iDV] ==  CST) ||
             (Design_Variable[iDV] == FFD_GULL) ||
             (Design_Variable[iDV] == FFD_ANGLE_OF_ATTACK) ) nParamDV = 2;
         if ((Design_Variable[iDV] ==  TRANSLATION) ||
             (Design_Variable[iDV] ==  NACA_4DIGITS) ||
-            (Design_Variable[iDV] ==  CST) ||
             (Design_Variable[iDV] ==  SURFACE_BUMP) ||
             (Design_Variable[iDV] ==  FFD_CAMBER) ||
             (Design_Variable[iDV] ==  FFD_TWIST_2D) ||

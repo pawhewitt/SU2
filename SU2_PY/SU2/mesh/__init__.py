@@ -5,3 +5,5 @@ __all__ = ['adapt']
 from SU2.mesh import adapt
 
 from SU2.mesh.tools import *
+
+from CST_ReMesh import CST_ReMesh

@@ -1546,6 +1546,14 @@ public:
 	void SetCST(CGeometry *boundary, CConfig *config, unsigned short iDV, bool ResetDef);
 
 	/*! 
+    * \brief The Factorial Number n! is defined as n!=n*(n-1)*...*2*1.
+    * \param[in] n - Index of the factorial.
+    * \return Value of the factorial.
+    */   
+   //unsigned short Factorial(unsigned short n);
+   int Factorial(int n);   
+
+	/*! 
 	 * \brief Set a NACA 4 digits airfoil family for airfoil deformation.
 	 * \param[in] boundary - Geometry of the boundary.
 	 * \param[in] config - Definition of the particular problem.

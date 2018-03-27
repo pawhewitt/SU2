@@ -679,7 +679,7 @@ def get_dvMap():
                17  : "FFD_THICKNESS_2D"      ,
                20  : "FFD_TWIST_2D"          ,
                50  : "CUSTOM"                ,
-               51  : "CST"                   ,
+               21  : "CST"                   ,
                101 : "ANGLE_OF_ATTACK"       ,
                102 : "FFD_ANGLE_OF_ATTACK"                    }
     
@@ -781,7 +781,7 @@ def get_gradFileFormat(grad_type,plot_format,kindID,special_cases=[]):
         header.append(r',"Loc_Start","Loc_End","Loc_Max"')
         write_format.append(r', %s, %s, %s')
     elif kindID == "CST"        :
-        header.append(r',"Up/Down","Kulfan number", "Total Kulfan numbers"')
+        header.append(r',"Up/Down","Weight"')
         write_format.append(r', %s, %s', '%s')
     elif kindID == "FAIRING"       :
         header.append(r',"ControlPoint_Index","Theta_Disp","R_Disp"')

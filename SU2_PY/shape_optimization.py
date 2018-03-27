@@ -134,6 +134,20 @@ def shape_optimization( filename                           ,
     if quiet: config.CONSOLE = 'CONCISE'
     config.GRADIENT_METHOD = gradient
     
+    # If paramterisation is CST then fit curve and remesh using /mesh/Re_Mesh
+    if (config['DEFINITION_DV']['KIND'][0]=="CST"):
+        # Returns a config object with cst params and cst mesh pointer
+        # Create the CST object
+        cst=SU2.mesh.CST_ReMesh(config)
+        # Read the surface Mesh 
+        U_Coords,L_Coords=cst.Read_Mesh()
+        # Curve Fit the cst
+        Au,Al=cst.Fit(U_Coords,L_Coords)
+        # # Re-mesh to eliminate residual varcoords
+        cst.Re_Mesh(Au,Al)
+        # # return config with param values and name of new mesh
+        config=cst.Update_Config()
+
     its              = int ( config.OPT_ITERATIONS )                      # number of opt iterations
     bound_upper      = float ( config.OPT_BOUND_UPPER )                   # variable bound to be scaled by the line search
     bound_lower      = float ( config.OPT_BOUND_LOWER )                   # variable bound to be scaled by the line search
@@ -147,6 +161,15 @@ def shape_optimization( filename                           ,
     xb_up            = [float(bound_upper)/float(relax_factor)]*n_dv      # upper dv bound it includes the line search acceleration fa
     xb          = list(zip(xb_low, xb_up)) # design bounds
     
+    # If using CST set specific lower bounds for each variable based on weight
+    if (config['DEFINITION_DV']['KIND'][0]=="CST"):
+        xb_low=[]
+        for param in config['DEFINITION_DV']['PARAM']:
+            if param[0]==0:
+                xb_low.append(param[1])
+            else:
+                xb_low.append(param[1]*-1)
+
     # State
     state = SU2.io.State()
     state.find_files(config)

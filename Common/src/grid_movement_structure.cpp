@@ -3037,6 +3037,7 @@ void CSurfaceMovement::SetSurface_Deformation(CGeometry *geometry, CConfig *conf
            (config->GetDesign_Variable(0) == TRANSLATION) ||
            (config->GetDesign_Variable(0) == SCALE) ||
            (config->GetDesign_Variable(0) == HICKS_HENNE) ||
+           (config->GetDesign_Variable(0) == CST) ||
            (config->GetDesign_Variable(0) == SURFACE_BUMP) ||
            (config->GetDesign_Variable(0) == ANGLE_OF_ATTACK)) {
     
@@ -3059,6 +3060,14 @@ void CSurfaceMovement::SetSurface_Deformation(CGeometry *geometry, CConfig *conf
       }
     }
     
+    /*--- Apply the design variables to the control point position ---*/
+    
+    for (iDV = 0; iDV < config->GetnDV(); iDV++) {
+      switch ( config->GetDesign_Variable(iDV) ) {
+        case CST :  SetCST(geometry, config, iDV, false); break;
+      }
+    }
+
     /*--- Apply the design variables to the control point position ---*/
 
     for (iDV = 0; iDV < config->GetnDV(); iDV++) {
@@ -5273,12 +5282,18 @@ void CSurfaceMovement::SetSurface_Bump(CGeometry *boundary, CConfig *config, uns
 void CSurfaceMovement::SetCST(CGeometry *boundary, CConfig *config, unsigned short iDV, bool ResetDef) {
 	unsigned long iVertex;
 	unsigned short iMarker;
-	su2double VarCoord[3] = {0.0,0.0,0.0}, VarCoord_[3] = {0.0,0.0,0.0}, *Coord_, *Normal_, fk,
+  int size;
+  su2double VarCoord[3] = {0.0,0.0,0.0}, VarCoord_[3] = {0.0,0.0,0.0}, *Coord_, *Normal_,CST,
+ 
   	Coord[3] = {0.0,0.0,0.0}, Normal[3] = {0.0,0.0,0.0},
   	TPCoord[2] = {0.0, 0.0}, LPCoord[2] = {0.0, 0.0}, Distance, Chord, AoA, ValCos, ValSin;
   
 	bool upper = true;
   su2double Scale = config->GetOpt_RelaxFactor();
+
+  #ifdef HAVE_MPI
+  size=MPI::COMM_WORLD.Get_size();
+  #endif
 
 	/*--- Reset airfoil deformation if first deformation or if it required by the solver ---*/
 
@@ -5364,30 +5379,50 @@ void CSurfaceMovement::SetCST(CGeometry *boundary, CConfig *config, unsigned sho
   /*--- WARNING: AoA currently overwritten to zero. ---*/
   AoA = 0.0;
 
-	/*--- Perform multiple airfoil deformation ---*/
-  	
-  su2double Ampl = config->GetDV_Value(iDV)*Scale;
-	su2double KulfanNum = config->GetParamDV(iDV, 1) - 1.0;
-	su2double maxKulfanNum = config->GetParamDV(iDV, 2) - 1.0;
-	if (KulfanNum < 0) {
-		std::cout << "Warning: Kulfan number should be greater than 1." << std::endl;
-	}
-	if (KulfanNum > maxKulfanNum) {
-		std::cout << "Warning: Kulfan number should be less than provided maximum." << std::endl;
-	}
+  if (config->GetParamDV(iDV, 0) == NO) { upper = false;}
+  if (config->GetParamDV(iDV, 0) == YES) { upper = true;}
 
-	if (config->GetParamDV(iDV, 0) == NO) { upper = false;}
-	if (config->GetParamDV(iDV, 0) == YES) { upper = true;}
-  
-	for (iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++) {
+  /* Order of Polynomial, assumes same order for both surfaces */
+  su2double BPO=((config->GetnDV())/2)-1;
+  /* Collect the weights that define the CST function from the config file*/
+  /* It's assumed that there is an equal number of variables for each surface */ 
+  /* Note that upper and lower curves aren't evaluated simultaneously, just the surface 
+  that corresponds to the current design variable iDV */ 
+  su2double A[config->GetnDV()/2];
+  su2double iparam;
+  /* Get the weights for the current surface being evaluated i.e. upper or lower*/
+  for (int i=0,j=0;i<config->GetnDV();i++){
+    if ((upper) && (config->GetParamDV(i,0)==1)){ // Upper 
+      A[j]=config->GetParamDV(i,1);
+      if (i==iDV){
+        A[j]+=config->GetDV_Value(iDV); // Update weight with current dv_value
+      }
+      j++;
 
-		for (iVertex = 0; iVertex < boundary->nVertex[iMarker]; iVertex++) {
-			VarCoord[0] = 0.0; VarCoord[1] = 0.0; VarCoord[2] = 0.0;
+    }else if ((!upper) && (config->GetParamDV(i,0)==0)){ // Lower
+      A[j]=config->GetParamDV(i,1);
+      if (i==iDV){
+        A[j]-=config->GetDV_Value(iDV); // Update weight with current dv_value
+      }
+      j++;
+    }
+    
+  }
+  /* Compute the Binomial Coefficient */
+  su2double K[config->GetnDV()/2];
+  for(int i=0;i<BPO+1;i++){
+    K[i] = Factorial(BPO)/(Factorial(i)*Factorial(BPO-i));
+  }
+
+  // Loop Over Surface Points 
+  for (iMarker = 0; iMarker < config->GetnMarker_All(); iMarker++) {
+    for (iVertex = 0; iVertex < boundary->nVertex[iMarker]; iVertex++) {
+      VarCoord[0] = 0.0; VarCoord[1] = 0.0; VarCoord[2] = 0.0;
       
-			if (config->GetMarker_All_DV(iMarker) == YES) {
+      if (config->GetMarker_All_DV(iMarker) == YES) {
         
-				Coord_ = boundary->vertex[iMarker][iVertex]->GetCoord();
-				Normal_ = boundary->vertex[iMarker][iVertex]->GetNormal();
+        Coord_ = boundary->vertex[iMarker][iVertex]->GetCoord();
+        Normal_ = boundary->vertex[iMarker][iVertex]->GetNormal();
         
         /*--- The CST functions should be applied to a basic airfoil without AoA,
          and unitary chord, a tranformation is required ---*/
@@ -5401,37 +5436,31 @@ void CSurfaceMovement::SetCST(CGeometry *boundary, CConfig *config, unsigned sho
         
         Normal[0] = Normal_[0]*ValCos - Normal_[1]*ValSin;
         Normal[1] = Normal_[1]*ValCos + Normal_[0]*ValSin;
-	
-        /*--- CST computation ---*/
-        su2double fact_n = 1;
-	su2double fact_cst = 1;
-        su2double fact_cst_n = 1;
-	
-	for (int i = 1; i <= maxKulfanNum; i++) {
-		fact_n = fact_n * i;
-	}
-	for (int i = 1; i <= KulfanNum; i++) {
-		fact_cst = fact_cst * i;
-	}
-	for (int i = 1; i <= maxKulfanNum - KulfanNum; i++) {
-		fact_cst_n = fact_cst_n * i;
-	} 
-	
-	// CST method only for 2D NACA type airfoils  
-	su2double N1, N2;       
-	N1 = 0.5;
-	N2 = 1.0;
- 
-	/*--- Upper and lower surface change in coordinates based on CST equations by Kulfan et. al (www.brendakulfan.com/docs/CST3.pdf)  ---*/
-        fk = pow(Coord[0],N1)*pow((1-Coord[0]), N2) * fact_n/(fact_cst*(fact_cst_n)) * pow(Coord[0], KulfanNum) * pow((1-Coord[0]), (maxKulfanNum-(KulfanNum)));
+  
+        if (((upper)&&(Normal[1]>0))||((!upper)&&(Normal[1]<0))){
+          /*--- Start Direct CST computation --- */
+          /* Evaluate the Class function using the x coords of the surface points */
+          su2double n1, n2, Cl;       
+          /* The exponents below correspond to a family of round nosed aerofoils with sharp trailing edges
+          See Kulfan's papers if other 2d shapes are required */
+          n1 = 0.5;
+          n2 = 1.0;
 
-	if (( upper) && (Normal[1] > 0)) { VarCoord[1] =  Ampl*fk; }
+          Cl=pow(Coord[0],n1)*pow((1-Coord[0]),n2); // Class function
+          /* Evaluate the Shape Functions */
+          su2double Sc,S=0;
+          for (int i=0;i<BPO+1;i++){
+            Sc=(K[i]*pow(Coord[0],i))*pow((1-Coord[0]),(BPO-i)); // Component Shape Function
+            S=S+(Sc*A[i]); // Total Shape Function
+          }
 
-        if ((!upper) && (Normal[1] < 0)) { VarCoord[1] =  Ampl*fk; }
+          CST=Cl*S;
 
-	
-	}
-      
+          VarCoord[1]=sqrt(pow((Coord[1]-CST),2));
+          
+          if (CST<Coord[1]){VarCoord[1]=VarCoord[1]*(-1);}
+      }
+  }
       /*--- Apply the transformation to the coordinate variation ---*/
 
       ValCos = cos(-AoA*PI_NUMBER/180.0);
@@ -5440,10 +5469,30 @@ void CSurfaceMovement::SetCST(CGeometry *boundary, CConfig *config, unsigned sho
       VarCoord_[0] = VarCoord[0]*ValCos - VarCoord[1]*ValSin;
       VarCoord_[1] = VarCoord[1]*ValCos + VarCoord[0]*ValSin;
 
-      			boundary->vertex[iMarker][iVertex]->AddVarCoord(VarCoord_);
-		}
-	}
+
+           /* Only count the varcoords once for each surface in the initial deformation otherwise varcoords
+            would stack up for each variable, only for SU2_DEF */
+            if ((config->GetDV_Value(iDV)==0.0) && (ResetDef==false)) {
+              /* set to zero for last in one series and first in the other */
+              if ((iDV<((config->GetnDV()/2)-1)) ||(iDV>(config->GetnDV()/2))) {
+                VarCoord_[0]=0.0; VarCoord_[1]=0.0;
+                }
+             }
+
+
+            boundary->vertex[iMarker][iVertex]->AddVarCoord(VarCoord_);
+    }
+  }
 }
+
+int CSurfaceMovement::Factorial (int n) {
+
+  if ( n > 1 ) n = n*Factorial(n-1);
+  if ( n == 0 ) n = 1;
+
+return n;
+}
+
 
 void CSurfaceMovement::SetRotation(CGeometry *boundary, CConfig *config, unsigned short iDV, bool ResetDef) {
 	unsigned long iVertex;
