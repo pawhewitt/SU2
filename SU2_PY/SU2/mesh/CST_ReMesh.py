@@ -153,7 +153,7 @@ class CST_ReMesh(object):
 
 
 	def Split(self,Coords):
-			# Spilt the surfaces according to the z component of the normal
+			# Spilt the surfaces according to the y component of the normal
 
 		U_Coords=[]
 		L_Coords=[]
